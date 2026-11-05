@@ -1,0 +1,50 @@
+name: CI
+
+on: [push, pull_request]
+
+permissions:
+	contents: read
+
+jobs:
+	validate-html:
+		runs-on: ubuntu-latest
+		steps:
+			- name: Check out repository
+				uses: actions/checkout@v4
+
+			- name: Set up Python
+				uses: actions/setup-python@v5
+				with:
+					python-version: "3.x"
+
+			- name: Check portfolio HTML
+				run: |
+					python - <<'PY'
+					from html.parser import HTMLParser
+					from pathlib import Path
+
+					class PortfolioHTMLCheck(HTMLParser):
+							def __init__(self):
+									super().__init__()
+									self.elements = set()
+
+							def handle_starttag(self, tag, attrs):
+									self.elements.add(tag)
+
+					page = Path("index.html")
+					if not page.is_file():
+							raise SystemExit("index.html was not found")
+
+					content = page.read_text(encoding="utf-8")
+					if not content.lstrip().lower().startswith("<!doctype html>"):
+							raise SystemExit("index.html must start with an HTML doctype")
+
+					parser = PortfolioHTMLCheck()
+					parser.feed(content)
+					required_elements = {"html", "head", "title", "body", "h1"}
+					missing = required_elements - parser.elements
+					if missing:
+							raise SystemExit(f"index.html is missing: {', '.join(sorted(missing))}")
+
+					print("index.html passed the portfolio smoke check")
+					PY
